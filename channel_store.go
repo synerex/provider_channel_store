@@ -20,7 +20,8 @@ import (
 var (
 	nodesrv         = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
 	channel         = flag.Int("channel", 3, "Recording channel type")
-	dir             = flag.String("dir", "store", "Directory of data storage") // for all file
+	dir             = flag.String("dir", "store", "Directory of data storage")     // for all file
+	saveFile        = flag.String("saveFile", "", "Save to single file with name") //
 	mu              sync.Mutex
 	sxServerAddress string
 	msgCount        int64
@@ -57,26 +58,37 @@ func (fs *FileSystemDataStore) store(str string) {
 	const layout = "2006-01-02"
 	day := time.Now()
 	todayStr := day.Format(layout) + ".csv"
-	if fs.todayStr != "" && fs.todayStr != todayStr {
-		fs.storeFile.Close()
-		fs.storeFile = nil
-	}
-	if fs.storeFile == nil {
-		_, er := os.Stat(fs.storeDir)
-		if er != nil { // create dir
-			er = os.MkdirAll(fs.storeDir, 0777)
-			if er != nil {
-				fmt.Printf("Can't make dir '%s'.", fs.storeDir)
+	if len(*saveFile) == 0 {
+		if fs.todayStr != "" && fs.todayStr != todayStr {
+			fs.storeFile.Close()
+			fs.storeFile = nil
+		}
+		if fs.storeFile == nil {
+			_, er := os.Stat(fs.storeDir)
+			if er != nil { // create dir
+				er = os.MkdirAll(fs.storeDir, 0777)
+				if er != nil {
+					fmt.Printf("Can't make dir '%s'.", fs.storeDir)
+					return
+				}
+			}
+			fs.todayStr = todayStr
+			file, err := os.OpenFile(filepath.FromSlash(fs.storeDir+"/"+todayStr), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				fmt.Printf("Can't open file '%s'", todayStr)
 				return
 			}
+			fs.storeFile = file
 		}
-		fs.todayStr = todayStr
-		file, err := os.OpenFile(filepath.FromSlash(fs.storeDir+"/"+todayStr), os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
-		if err != nil {
-			fmt.Printf("Can't open file '%s'", todayStr)
-			return
+	} else {
+		if fs.storeFile == nil {
+			file, err := os.OpenFile(*saveFile, os.O_RDWR|os.O_CREATE|os.O_APPEND, 0666)
+			if err != nil {
+				fmt.Printf("Can't open file '%s'", *saveFile)
+				return
+			}
+			fs.storeFile = file
 		}
-		fs.storeFile = file
 	}
 	fs.storeFile.WriteString(str + "\n")
 }
