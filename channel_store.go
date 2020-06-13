@@ -8,6 +8,8 @@ import (
 	"log"
 	"os"
 	"path/filepath"
+	"strconv"
+	"strings"
 	"sync"
 	"time"
 
@@ -19,7 +21,7 @@ import (
 
 var (
 	nodesrv         = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
-	channel         = flag.Int("channel", 3, "Recording channel type")
+	channel         = flag.String("channel", "3", "Recording channel type(default 3, support comma separated)")
 	dir             = flag.String("dir", "store", "Directory of data storage")     // for all file
 	saveFile        = flag.String("saveFile", "", "Save to single file with name") //
 	mu              sync.Mutex
@@ -111,6 +113,8 @@ func subscribeSupply(client *sxutil.SXServiceClient) {
 		// comes here if channel closed
 		log.Printf("Server closed... on Forward provider")
 
+		//TODO: we may need mutex not to fix simultaneously.
+
 		time.Sleep(5 * time.Second)
 		newClt := sxutil.GrpcConnectServer(sxServerAddress)
 		if newClt != nil {
@@ -135,9 +139,19 @@ func main() {
 	go sxutil.HandleSigInt()
 	sxutil.RegisterDeferFunction(sxutil.UnRegisterNode)
 
-	channelTypes := []uint32{uint32(*channel)}
+	channelTypes := []uint32{}
+	chans := strings.Split(*channel, ",")
+	for _, ch := range chans {
+		v, err := strconv.Atoi(ch)
+		if err == nil {
+			channelTypes = append(channelTypes, uint32(v))
+		} else {
+			log.Fatal("Can't convert channels ", *channel)
+		}
+	}
+
 	// obtain synerex server address from nodeserv
-	srcSSrv, err := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelStore[%d]", *channel), channelTypes, nil)
+	srcSSrv, err := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelStore[%s]", *channel), channelTypes, nil)
 	if err != nil {
 		log.Fatal("Can't register to nodeserv...")
 	}
@@ -146,14 +160,19 @@ func main() {
 
 	wg := sync.WaitGroup{} // for syncing other goroutines
 	srcClient := sxutil.GrpcConnectServer(sxServerAddress)
-	argJson := fmt.Sprintf("{ChannelStore[%d]}", *channel)
-	sxClient := sxutil.NewSXServiceClient(srcClient, uint32(*channel), argJson)
 
-	wg.Add(1)
+	// we need to add clients for each channel:
+	pcClients := map[uint32]*sxutil.SXServiceClient{}
 
 	// currently only work for supply ....
 	// ToDO: add demand store.
-	go subscribeSupply(sxClient)
+	for _, chnum := range channelTypes {
+		argJson := fmt.Sprintf("{ChannelRetrieve[%d]}", chnum)
+		pcClients[chnum] = sxutil.NewSXServiceClient(srcClient, chnum, argJson)
+		go subscribeSupply(pcClients[chnum]) // currently , we need different goroutines
+		wg.Add(1)
+	}
+
 	go monitorStatus()
 
 	wg.Wait()
