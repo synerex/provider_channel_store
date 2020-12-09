@@ -119,7 +119,7 @@ func subscribeSupply(client *sxutil.SXServiceClient) {
 		newClt := sxutil.GrpcConnectServer(sxServerAddress)
 		if newClt != nil {
 			log.Printf("Reconnect server [%s]", sxServerAddress)
-			client.Client = newClt
+			client.SXClient = newClt
 		}
 	}
 }
