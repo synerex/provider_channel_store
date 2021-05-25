@@ -22,6 +22,7 @@ import (
 var (
 	nodesrv         = flag.String("nodesrv", "127.0.0.1:9990", "Node ID Server")
 	channel         = flag.String("channel", "3", "Recording channel type(default 3, support comma separated)")
+	local		= flag.String("local", "", "Local sxsrv addr")
 	dir             = flag.String("dir", "store", "Directory of data storage")     // for all file
 	saveFile        = flag.String("saveFile", "", "Save to single file with name") //
 	mu              sync.Mutex
@@ -101,7 +102,7 @@ func supplyCallback(clt *sxutil.SXServiceClient, sm *pb.Supply) {
 	// we need to store sm into csv file.
 	ts := ptypes.TimestampString(sm.Ts)
 	bsd := base64.StdEncoding.EncodeToString(sm.Cdata.Entity)
-	line := fmt.Sprintf("%s,%d,%d,%d,%d,%s,%s,%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
+	line := fmt.Sprintf("%s,%d,%d,%d,%d,%s,\"%s\",%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
 	ds.store(line)
 }
 
@@ -154,6 +155,9 @@ func main() {
 	srcSSrv, err := sxutil.RegisterNode(*nodesrv, fmt.Sprintf("ChannelStore[%s]", *channel), channelTypes, nil)
 	if err != nil {
 		log.Fatal("Can't register to nodeserv...")
+	}
+	if *local !=  "" {
+		srcSSrv = *local
 	}
 	log.Printf("Connecting Server [%s]\n", srcSSrv)
 	sxServerAddress = srcSSrv
