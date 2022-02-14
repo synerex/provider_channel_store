@@ -44,15 +44,24 @@ type FileSystemDataStore struct {
 }
 
 func init() {
-	var err error
+	flag.Parse()
 	msgCount = 0
-	dataDir, err := os.Getwd()
-	if err != nil {
-		fmt.Printf("Can't obtain current wd")
-	}
-	dataDir = filepath.ToSlash(dataDir) + "/" + *dir
-	ds = &FileSystemDataStore{
-		storeDir: dataDir,
+	if ((*dir)[0] == '/') {
+		log.Printf("Saving data to: " + *dir)
+		ds = &FileSystemDataStore{
+			storeDir: *dir,
+		}
+	} else {
+		var err error
+		dataDir, err := os.Getwd()
+		if err != nil {
+			fmt.Printf("Can't obtain current wd")
+		}
+		dataDir = filepath.ToSlash(dataDir) + "/" + *dir
+		log.Printf("Saving data to: " + dataDir)
+		ds = &FileSystemDataStore{
+			storeDir: dataDir,
+		}
 	}
 }
 
@@ -135,7 +144,6 @@ func monitorStatus() {
 
 func main() {
 	log.Printf("ChannelStore(%s) built %s sha1 %s", sxutil.GitVer, sxutil.BuildTime, sxutil.Sha1Ver)
-	flag.Parse()
 
 	go sxutil.HandleSigInt()
 	sxutil.RegisterDeferFunction(sxutil.UnRegisterNode)
