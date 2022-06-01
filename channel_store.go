@@ -101,7 +101,12 @@ func supplyCallback(clt *sxutil.SXServiceClient, sm *pb.Supply) {
 	msgCount++
 	// we need to store sm into csv file.
 	ts := ptypes.TimestampString(sm.Ts)
-	bsd := base64.StdEncoding.EncodeToString(sm.Cdata.Entity)
+	var bsd string
+	if sm.Cdata != nil {
+		bsd = base64.StdEncoding.EncodeToString(sm.Cdata.Entity)
+	}else{
+		bsd = "\"\""
+	}
 	line := fmt.Sprintf("%s,%d,%d,%d,%d,%s,\"%s\",%d,%s", ts, sm.Id, sm.SenderId, sm.TargetId, sm.ChannelType, sm.SupplyName, sm.ArgJson, sm.MbusId, bsd)
 	ds.store(line)
 }
